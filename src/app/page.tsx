@@ -1,11 +1,22 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import SiteHeader from "@/components/SiteHeader";
+import { useRouter } from "next/navigation";
+import { LocalUser, LOCAL_USER_STORAGE_KEY } from "@/lib/user-storage";
+
+type RetroBoardResponse = {
+  id: string;
+  title: string;
+  participants: Array<{ user: { id: string } }>;
+};
 
 export default function Home() {
   const heroRef = useRef(null);
   const cardRef = useRef(null);
+  const router = useRouter();
+  const [user, setUser] = useState<LocalUser | null>(null);
+  const [joinedBoards, setJoinedBoards] = useState<Array<{ id: string; title: string }>>([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -48,6 +59,51 @@ export default function Home() {
     return () => ctx.revert();
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_USER_STORAGE_KEY);
+      if (stored) {
+        const parsed: LocalUser = JSON.parse(stored);
+        setUser(parsed);
+      }
+    } catch (cause) {
+      console.warn("Unable to read stored user", cause);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setJoinedBoards([]);
+      return;
+    }
+    let cancelled = false;
+
+    async function fetchJoinedBoards() {
+      try {
+        const response = await fetch("/api/retro-boards");
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error ?? "Unable to fetch boards");
+        }
+        if (cancelled) return;
+        const payload: RetroBoardResponse[] = await response.json();
+        const nextBoards = payload
+          .filter((item) => item.participants.some((participant) => participant.user.id === user.id))
+          .map((item) => ({ id: item.id, title: item.title }));
+        setJoinedBoards(nextBoards);
+      } catch (cause) {
+        if (!cancelled) {
+          console.warn("Unable to fetch joined boards", cause);
+        }
+      }
+    }
+
+    fetchJoinedBoards();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   return (
     <div className="relative isolate flex min-h-screen flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -55,7 +111,11 @@ export default function Home() {
         <div className="absolute bottom-[10%] right-[12%] h-72 w-72 rounded-full bg-retroscope-teal/20 blur-[140px] dark:bg-retroscope-teal/25" />
       </div>
 
-      <SiteHeader />
+      <SiteHeader
+        user={user ?? undefined}
+        joinedBoards={joinedBoards}
+        onSelectBoard={(nextBoardId) => router.push(`/retro-boards/${nextBoardId}`)}
+      />
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 items-center px-6 pb-16 pt-6 sm:px-10">
         <div ref={heroRef} className="grid w-full items-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px]">

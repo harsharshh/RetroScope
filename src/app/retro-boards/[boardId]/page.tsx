@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
+import { LocalUser, LOCAL_USER_STORAGE_KEY } from "@/lib/user-storage";
 
 interface RetroBoardPayload {
   id: string;
@@ -13,14 +14,6 @@ interface RetroBoardPayload {
   stages: Array<{ id: string; name: string; order: number }>;
   participants: Array<{ id: string; role?: string | null; user: { id: string; name?: string | null; email: string } }>;
 }
-
-interface LocalUser {
-  id: string;
-  email: string;
-  name?: string | null;
-}
-
-const LOCAL_STORAGE_KEY = "retroscope:user";
 
 export default function BoardPage({ params }: { params: Promise<{ boardId: string }> }) {
   const router = useRouter();
@@ -51,10 +44,11 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
   const [profileEmail, setProfileEmail] = useState("");
   const [profileSubmitting, setProfileSubmitting] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [joinedBoards, setJoinedBoards] = useState<Array<{ id: string; title: string }>>([]);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const stored = localStorage.getItem(LOCAL_USER_STORAGE_KEY);
       if (stored) {
         const value: LocalUser = JSON.parse(stored);
         setUser(value);
@@ -122,9 +116,58 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     ensureParticipant();
   }, [board, user, boardId]);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function fetchJoinedBoards() {
+      try {
+        const response = await fetch("/api/retro-boards");
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error ?? "Unable to fetch boards");
+        }
+        if (cancelled) return;
+        const payload: RetroBoardPayload[] = await response.json();
+        const nextBoards = payload
+          .filter((item) => item.participants.some((participant) => participant.user.id === user.id))
+          .map((item) => ({ id: item.id, title: item.title }));
+        setJoinedBoards(nextBoards);
+      } catch (cause) {
+        if (!cancelled) {
+          console.warn("Unable to fetch joined boards", cause);
+        }
+      }
+    }
+
+    fetchJoinedBoards();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const sortedStages = useMemo(() => {
     return board?.stages.slice().sort((a, b) => a.order - b.order) ?? [];
   }, [board]);
+
+  const stageCount = sortedStages.length;
+  const stageGridClass = useMemo(() => {
+    if (stageCount <= 1) {
+      return "grid-cols-1";
+    }
+    if (stageCount === 2) {
+      return "grid-cols-1 md:grid-cols-2";
+    }
+    if (stageCount === 3) {
+      return "grid-cols-1 md:grid-cols-3";
+    }
+    return "grid-cols-1 md:grid-cols-3";
+  }, [stageCount]);
+
+  const stageGridRowClass = stageCount > 3 ? "md:grid-rows-2 md:auto-rows-fr" : "";
+  const stageCardClass = `${
+    stageCount <= 1 ? "min-h-[60vh]" : "min-h-[260px]"
+  } flex h-full flex-col rounded-2xl border border-surface-border bg-surface/80 p-6 shadow-sm backdrop-blur`;
 
   async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,7 +194,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
       }
 
       const nextUser: LocalUser = await userResponse.json();
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextUser));
+      localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(nextUser));
       setUser(nextUser);
       setShowProfileModal(false);
 
@@ -177,9 +220,14 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
 
   return (
     <div className="relative isolate flex min-h-screen flex-col bg-background">
-      <SiteHeader />
+      <SiteHeader
+        user={user ?? undefined}
+        joinedBoards={joinedBoards}
+        onSelectBoard={(nextBoardId) => router.push(`/retro-boards/${nextBoardId}`)}
+        boardContext={board ? { id: board.id, title: board.title } : undefined}
+      />
 
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 pb-16 pt-6 sm:px-10">
+      <main className="mx-auto flex w-full  flex-1 flex-col gap-6 px-6 pb-16 pt-6 sm:px-10">
         {loading ? (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
             Loading board…
@@ -197,18 +245,13 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
           </div>
         ) : board ? (
           <div className="flex flex-1 flex-col gap-8">
-            <div className="rounded-3xl border border-surface-border bg-surface/80 p-8 shadow-glow backdrop-blur">
-              <h1 className="text-4xl font-semibold text-foreground">{board.title}</h1>
-              {board.summary ? (
-                <p className="mt-2 text-sm text-muted-foreground">{board.summary}</p>
-              ) : null}
-            </div>
+            
 
-            <section className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-3">
+            <section className={`grid flex-1 gap-6 ${stageGridClass} ${stageGridRowClass}`}>
               {sortedStages.map((stage) => (
                 <div
                   key={stage.id}
-                  className="flex min-h-[260px] flex-col rounded-2xl border border-surface-border bg-surface/80 p-6 shadow-sm backdrop-blur"
+                  className={stageCardClass}
                 >
                   <header className="mb-4 flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-foreground">{stage.name}</h2>
