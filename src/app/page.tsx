@@ -75,7 +75,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <a
-                href="#get-started"
+                href="/create-board"
                 className="hero-cta inline-flex items-center justify-center rounded-full bg-retroscope-gradient px-6 py-3 text-base font-semibold text-white shadow-glow transition-transform hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-retroscope-orange"
               >
                 Get started for free

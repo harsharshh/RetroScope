@@ -10,7 +10,9 @@ const DEFAULT_STAGE_TEMPLATE = [
 type CreateBoardBody = {
   title: string;
   summary?: string;
-  ownerId: string;
+  ownerId?: string;
+  ownerEmail?: string;
+  ownerName?: string;
   facilitatorId?: string;
   scheduledFor?: string;
   stages?: Array<{ name: string; order?: number }>;
@@ -53,8 +55,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body.title || !body.ownerId) {
-    return NextResponse.json({ error: "title and ownerId are required" }, { status: 422 });
+  if (!body.title) {
+    return NextResponse.json({ error: "title is required" }, { status: 422 });
   }
 
   const stagePayload = (body.stages?.length ? body.stages : DEFAULT_STAGE_TEMPLATE).map(
@@ -65,22 +67,42 @@ export async function POST(request: Request) {
   );
 
   try {
+    let ownerId = body.ownerId?.trim() || undefined;
+
+    if (!ownerId && body.ownerEmail?.trim()) {
+      const user = await prisma.user.upsert({
+        where: { email: body.ownerEmail.trim() },
+        update: {
+          name: body.ownerName?.trim() || undefined,
+        },
+        create: {
+          email: body.ownerEmail.trim(),
+          name: body.ownerName?.trim() || undefined,
+        },
+      });
+      ownerId = user.id;
+    }
+
     const board = await prisma.retroBoard.create({
       data: {
         title: body.title,
         summary: body.summary,
-        ownerId: body.ownerId,
+        ownerId,
         facilitatorId: body.facilitatorId,
         scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : undefined,
         stages: {
           create: stagePayload,
         },
-        participants: {
-          create: {
-            userId: body.ownerId,
-            role: "OWNER",
-          },
-        },
+        ...(ownerId
+          ? {
+              participants: {
+                create: {
+                  userId: ownerId,
+                  role: "OWNER",
+                },
+              },
+            }
+          : {}),
       },
       include: {
         stages: {

@@ -61,7 +61,7 @@ Lightweight REST endpoints allow you to manage users and retro boards straight a
 
 - `POST /api/users` – create or update a user `{ email, name?, avatarUrl? }`
 - `GET /api/users?email=` – look up a specific user (or list the latest users)
-- `POST /api/retro-boards` – create a board `{ title, ownerId, summary?, facilitatorId?, scheduledFor?, stages?[] }`
+- `POST /api/retro-boards` – create a board `{ title, ownerId?, ownerEmail?, ownerName?, summary?, facilitatorId?, scheduledFor?, stages?[] }`
 - `GET /api/retro-boards?ownerId=` – list boards with stages and participants
 - `GET /api/retro-boards/:boardId` – fetch full board detail including cards, comments, and reactions
 - `PATCH /api/retro-boards/:boardId` – update metadata (title, status, schedule, facilitator)
@@ -76,6 +76,12 @@ Lightweight REST endpoints allow you to manage users and retro boards straight a
 All POST/PATCH endpoints accept JSON bodies; responses are JSON encoded Prisma entities.
 
 > If you invoke Prisma CLI commands directly, prefix them with `dotenv -e .env.local --` (for example `dotenv -e .env.local -- npx prisma db push`) so the `PRISMA_DATABASE_URL` environment variable is available.
+
+## Create Board UI
+
+Visit `/create-board` from the homepage CTA to spin up a board. Provide a board name, choose how many columns you want, and name each column. If you supply owner details, they are sent along to `/api/retro-boards`; otherwise the board is created without an owner and you’re forwarded to `/retro-boards/:boardId`.
+
+The board view prompts first-time visitors for their name & email, stores that locally, creates/updates the user via `/api/users`, and adds them to the board through `/api/retro-boards/:boardId/participants` before revealing the columns.
 
 ## Available Scripts
 
