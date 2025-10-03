@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 interface SiteHeaderProps {
@@ -8,22 +8,59 @@ interface SiteHeaderProps {
   joinedBoards?: Array<{ id: string; title: string }>;
   onSelectBoard?: (boardId: string) => void;
   boardContext?: { id: string; title: string };
+  stageFilters?: Array<{ id: string; name: string }>;
+  activeStageFilter?: string | "ALL";
+  onStageFilterChange?: (value: string | "ALL") => void;
+  onExport?: (format: "pdf" | "excel") => void;
 }
 
-export default function SiteHeader({ user, joinedBoards = [], onSelectBoard, boardContext }: SiteHeaderProps) {
+export default function SiteHeader({
+  user,
+  joinedBoards = [],
+  onSelectBoard,
+  boardContext,
+  stageFilters = [],
+  activeStageFilter = "ALL",
+  onStageFilterChange,
+  onExport,
+}: SiteHeaderProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [showBoards, setShowBoards] = useState(false);
   const [copiedBoardId, setCopiedBoardId] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const exportTriggerRef = useRef<HTMLButtonElement>(null);
+  const exportPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isPopoverOpen) return;
+    if (!isPopoverOpen && !isFilterOpen && !isExportOpen) return;
 
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
-      if (!triggerRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+      if (
+        isPopoverOpen &&
+        !triggerRef.current?.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setIsPopoverOpen(false);
+      }
+      if (
+        isFilterOpen &&
+        !filterTriggerRef.current?.contains(target) &&
+        !filterPopoverRef.current?.contains(target)
+      ) {
+        setIsFilterOpen(false);
+      }
+      if (
+        isExportOpen &&
+        !exportTriggerRef.current?.contains(target) &&
+        !exportPopoverRef.current?.contains(target)
+      ) {
+        setIsExportOpen(false);
       }
     }
 
@@ -31,7 +68,7 @@ export default function SiteHeader({ user, joinedBoards = [], onSelectBoard, boa
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isPopoverOpen]);
+  }, [isPopoverOpen, isFilterOpen, isExportOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -39,6 +76,10 @@ export default function SiteHeader({ user, joinedBoards = [], onSelectBoard, boa
       setShowBoards(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!stageFilters.length) setIsFilterOpen(false);
+  }, [stageFilters]);
 
   useEffect(() => {
     if (!showBoards) return;
@@ -57,6 +98,11 @@ export default function SiteHeader({ user, joinedBoards = [], onSelectBoard, boa
 
   const avatarInitial = user ? (user.name?.trim()?.[0] ?? user.email?.[0] ?? "?") : "";
   const displayName = user?.name?.trim() || user?.email || "";
+
+  const activeStageLabel = useMemo(() => {
+    if (activeStageFilter === "ALL") return "All stages";
+    return stageFilters.find((stage) => stage.id === activeStageFilter)?.name ?? "All stages";
+  }, [activeStageFilter, stageFilters]);
 
   async function handleCopy(boardId: string) {
     try {
@@ -92,6 +138,132 @@ export default function SiteHeader({ user, joinedBoards = [], onSelectBoard, boa
             ) : null}
           </div>
           <div className="flex items-center gap-3">
+            {onExport ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  ref={exportTriggerRef}
+                  onClick={() => setIsExportOpen((previous) => !previous)}
+                  className="flex items-center gap-2 rounded-full border border-surface-border bg-surface/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
+                  aria-haspopup="menu"
+                  aria-expanded={isExportOpen}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Export
+                </button>
+                {isExportOpen ? (
+                  <div
+                    ref={exportPopoverRef}
+                    className="absolute right-0 z-40 mt-2 w-44 rounded-2xl border border-surface-border bg-background p-2 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportOpen(false);
+                        onExport?.("pdf");
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition hover:bg-retroscope-orange/10 hover:text-retroscope-orange"
+                    >
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportOpen(false);
+                        onExport?.("excel");
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition hover:bg-retroscope-orange/10 hover:text-retroscope-orange"
+                    >
+                      Excel
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {stageFilters.length ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  ref={filterTriggerRef}
+                  onClick={() => setIsFilterOpen((previous) => !previous)}
+                  className={`flex items-center gap-2 rounded-full border border-surface-border bg-surface/80 px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:border-retroscope-orange/60 ${
+                    activeStageFilter !== "ALL" ? "text-retroscope-orange" : "text-foreground"
+                  }`}
+                  aria-haspopup="listbox"
+                  aria-expanded={isFilterOpen}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <path d="M3 4h18" />
+                    <path d="M6 8h12" />
+                    <path d="M10 12h4" />
+                    <path d="M12 16v4" />
+                  </svg>
+                  {activeStageLabel}
+                </button>
+                {isFilterOpen ? (
+                  <div
+                    ref={filterPopoverRef}
+                    className="absolute right-0 z-40 mt-2 w-48 rounded-2xl border border-surface-border bg-background p-2 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onStageFilterChange?.("ALL");
+                        setIsFilterOpen(false);
+                      }}
+                      className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition hover:bg-retroscope-orange/10 hover:text-retroscope-orange ${
+                        activeStageFilter === "ALL" ? "bg-retroscope-orange/10 text-retroscope-orange" : "text-foreground"
+                      }`}
+                    >
+                      All stages
+                    </button>
+                    <div className="mt-1 flex max-h-56 flex-col gap-1 overflow-y-auto">
+                      {stageFilters.map((stage) => (
+                        <button
+                          key={stage.id}
+                          type="button"
+                          onClick={() => {
+                            onStageFilterChange?.(stage.id);
+                            setIsFilterOpen(false);
+                          }}
+                          className={`w-full rounded-xl px-3 py-2 text-left text-xs font-semibold transition hover:bg-retroscope-orange/10 hover:text-retroscope-orange ${
+                            activeStageFilter === stage.id
+                              ? "bg-retroscope-orange/10 text-retroscope-orange"
+                              : "text-foreground"
+                          }`}
+                        >
+                          {stage.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {user ? (
               <div className="relative">
                 <button
