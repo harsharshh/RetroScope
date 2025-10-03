@@ -138,7 +138,7 @@ export default function SiteHeader({
             ) : null}
           </div>
           <div className="flex items-center gap-3">
-            {onExport ? (
+            {onExport && boardContext ? (
               <div className="relative">
                 <button
                   type="button"
