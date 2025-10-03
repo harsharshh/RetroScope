@@ -16,6 +16,7 @@
   --glow-primary: rgba(46, 211, 183, 0.35);
   --glow-secondary: rgba(179, 98, 255, 0.25);
   --shadow-soft: rgba(15, 23, 42, 0.1);
+  --background-gradient: linear-gradient(135deg, #f5f7ff 0%, #ffffff 45%, #d6defc 100%);
 }
 
 /* Theme overrides via data-theme attribute */
@@ -29,12 +30,15 @@
   --glow-primary: rgba(46, 211, 183, 0.2);
   --glow-secondary: rgba(179, 98, 255, 0.18);
   --shadow-soft: rgba(5, 9, 20, 0.5);
+  --background-gradient: linear-gradient(135deg, #050914 0%, #0b1329 40%, #162448 100%);
 }
 
 body {
   background-color: var(--background);
-  background-image: radial-gradient(120% 140% at 0% 0%, var(--glow-primary) 0%, transparent 55%),
+  background-image: var(--background-gradient),
+    radial-gradient(120% 140% at 0% 0%, var(--glow-primary) 0%, transparent 55%),
     radial-gradient(120% 140% at 100% 100%, var(--glow-secondary) 0%, transparent 60%);
+  background-blend-mode: normal, screen, screen;
   background-attachment: fixed;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
