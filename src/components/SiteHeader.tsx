@@ -186,7 +186,7 @@ export default function SiteHeader({
                   type="button"
                   ref={participantsTriggerRef}
                   onClick={() => setIsParticipantsOpen((previous) => !previous)}
-                  className="flex items-center gap-2 rounded-full bg-surface/90 px-4 py-2 text-sm font-semibold text-foreground shadow-sm backdrop-blur transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
+                  className="flex items-center gap-2 rounded-full bg-surface/90 text-sm font-semibold text-foreground shadow-sm backdrop-blur transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
                   aria-haspopup="listbox"
                   aria-expanded={isParticipantsOpen}
                 >
