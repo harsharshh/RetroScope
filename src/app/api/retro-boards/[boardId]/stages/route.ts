@@ -3,9 +3,9 @@ import prisma from "@/lib/prisma";
 
 export async function POST(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
   let body: { name?: string; order?: number };
 
   try {
@@ -36,9 +36,9 @@ export async function POST(
 
 export async function GET(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
 
   try {
     const stages = await prisma.retroStage.findMany({

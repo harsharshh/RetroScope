@@ -11,9 +11,9 @@ type CreateCardBody = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
 
   try {
     const cards = await prisma.retroCard.findMany({
@@ -39,9 +39,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
   let body: CreateCardBody;
 
   try {

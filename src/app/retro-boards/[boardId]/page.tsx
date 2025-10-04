@@ -5,7 +5,6 @@ import {
   useMemo,
   useState,
   useRef,
-  type CSSProperties,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -253,15 +252,17 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
   useEffect(() => {
     if (!board || !user || !boardId) return;
     const participantIds = board.participants.map((participant) => participant.user.id);
-    if (participantIds.includes(user.id)) return;
+    if (user && participantIds.includes(user.id)) return;
 
     async function ensureParticipant() {
       try {
-        await fetch(`/api/retro-boards/${boardId}/participants`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id, role: "MEMBER" }),
-        });
+        if (user) {
+          await fetch(`/api/retro-boards/${boardId}/participants`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: user.id, role: "MEMBER" }),
+          });
+        }
         const response = await fetch(`/api/retro-boards/${boardId}`);
         if (response.ok) {
           const payload: RetroBoardPayload = await response.json();
@@ -289,7 +290,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
         if (cancelled) return;
         const payload: RetroBoardPayload[] = await response.json();
         const nextBoards = payload
-          .filter((item) => item.participants.some((participant) => participant.user.id === user.id))
+          .filter((item) => user && item.participants.some((participant) => participant.user.id === user.id))
           .map((item) => ({ id: item.id, title: item.title }));
         setJoinedBoards(nextBoards);
       } catch (cause) {
@@ -1273,7 +1274,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
                             color: preset?.textColor,
                             transform: `rotate(${tilt}deg)`,
                             "--note-strip": preset?.stripColor,
-                          }}
+                          } as React.CSSProperties}
                         >
                             <div className="pointer-events-none absolute left-0 top-0 h-8 w-full rounded-b-[22px] opacity-90 transition-colors duration-300 before:absolute before:inset-0 before:bg-[var(--note-strip)] before:content-['']" />
                             {editing ? (
@@ -1302,7 +1303,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
                                   backgroundColor: preset?.inputBackground,
                                   color: preset?.textColor,
                                   "--placeholder-color": preset?.placeholderColor,
-                                } satisfies CSSProperties}
+                                } as React.CSSProperties}
                                 placeholder="Update your insight…"
                                 autoFocus
                               />
@@ -1425,7 +1426,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
                             backgroundColor: stageColors[stage.id]?.draftBackground,
                             color: stageColors[stage.id]?.textColor,
                             "--note-strip": stageColors[stage.id]?.stripColor,
-                          }}
+                          } as React.CSSProperties}
                         >
                           <textarea
                             value={draft.content}
@@ -1446,7 +1447,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
                               backgroundColor: stageColors[stage.id]?.inputBackground,
                               color: stageColors[stage.id]?.textColor,
                               "--placeholder-color": stageColors[stage.id]?.placeholderColor,
-                            } satisfies CSSProperties}
+                            } as React.CSSProperties}
                             placeholder="Share your thoughts…"
                             autoFocus
                           />

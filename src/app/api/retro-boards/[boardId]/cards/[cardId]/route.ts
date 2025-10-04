@@ -4,9 +4,9 @@ import prisma from "@/lib/prisma";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { boardId: string; cardId: string } }
+  { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = params;
+  const { boardId, cardId } = await params;
   let body: Partial<{
     content: string;
     type: string;
@@ -43,22 +43,22 @@ export async function PATCH(
 
     return NextResponse.json(card);
   } catch (error) {
-    console.error(`PATCH /api/retro-boards/${params.boardId}/cards/${cardId} failed`, error);
+    console.error(`PATCH /api/retro-boards/${boardId}/cards/${cardId} failed`, error);
     return NextResponse.json({ error: "Unable to update card" }, { status: 500 });
   }
 }
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { boardId: string; cardId: string } }
+  { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = params;
+  const { boardId, cardId } = await params;
 
   try {
     await prisma.retroCard.delete({ where: { id: cardId } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error(`DELETE /api/retro-boards/${params.boardId}/cards/${cardId} failed`, error);
+    console.error(`DELETE /api/retro-boards/${boardId}/cards/${cardId} failed`, error);
     return NextResponse.json({ error: "Unable to delete card" }, { status: 500 });
   }
 }

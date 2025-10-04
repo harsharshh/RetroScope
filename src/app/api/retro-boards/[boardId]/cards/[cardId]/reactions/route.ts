@@ -8,9 +8,9 @@ type ReactionBody = {
 
 export async function POST(
   request: Request,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = params;
+  const { cardId } = await params;
   let body: ReactionBody;
 
   try {
@@ -49,9 +49,9 @@ export async function POST(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = params;
+  const { cardId } = await params;
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const userId = searchParams.get("userId");

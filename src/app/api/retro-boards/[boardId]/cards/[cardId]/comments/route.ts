@@ -8,9 +8,9 @@ type CommentBody = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = params;
+  const { cardId } = await params;
 
   try {
     const comments = await prisma.retroComment.findMany({
@@ -27,9 +27,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = params;
+  const { cardId } = await params;
   let body: CommentBody;
 
   try {

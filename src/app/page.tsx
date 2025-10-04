@@ -88,7 +88,7 @@ export default function Home() {
         if (cancelled) return;
         const payload: RetroBoardResponse[] = await response.json();
         const nextBoards = payload
-          .filter((item) => item.participants.some((participant) => participant.user.id === user.id))
+          .filter((item) => user && item.participants.some((participant) => participant.user.id === user.id))
           .map((item) => ({ id: item.id, title: item.title }));
         setJoinedBoards(nextBoards);
       } catch (cause) {

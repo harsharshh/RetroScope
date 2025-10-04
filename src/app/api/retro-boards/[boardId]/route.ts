@@ -4,9 +4,9 @@ import prisma from "@/lib/prisma";
 
 export async function GET(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
 
   try {
     const board = await prisma.retroBoard.findUnique({
@@ -52,9 +52,9 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
   let body: Partial<{
     title: string;
     summary: string | null;
@@ -106,9 +106,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { boardId: string } }
+  { params }: { params: Promise<{ boardId: string }> }
 ) {
-  const { boardId } = params;
+  const { boardId } = await params;
 
   try {
     await prisma.retroBoard.delete({ where: { id: boardId } });
