@@ -8,6 +8,8 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
+import type Pusher from "pusher-js";
+import type { PresenceChannel } from "pusher-js";
 import gsap from "gsap";
 import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
@@ -34,6 +36,11 @@ interface RetroCardPayload {
 }
 
 const UPVOTE_TYPE = "UPVOTE";
+
+type ActivePresenceParticipant = {
+  id: string;
+  user: { id: string; name?: string | null; email: string };
+};
 
 function getUpvoteCount(card: RetroCardPayload): number {
   return (card.reactions ?? []).reduce(
@@ -173,6 +180,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     { content: string; saving: boolean; error: string | null }
   >>({});
   const [activeStageFilter, setActiveStageFilter] = useState<string | "ALL">("ALL");
+  const [activeParticipants, setActiveParticipants] = useState<ActivePresenceParticipant[]>([]);
   const [confirmingDeleteCardId, setConfirmingDeleteCardId] = useState<string | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 
@@ -362,9 +370,85 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     return sortedStages.map((stage) => ({ id: stage.id, name: stage.name }));
   }, [sortedStages]);
 
-  const activeParticipants = useMemo(() => {
-    return (board?.participants ?? []).filter((participant) => Boolean(participant.user));
-  }, [board?.participants]);
+  useEffect(() => {
+    const userId = user?.id;
+    const userEmail = user?.email;
+    const userName = user?.name;
+
+    if (!boardId) {
+      setActiveParticipants([]);
+      return;
+    }
+
+    const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+    if (!key || !cluster) return;
+    if (!userId || !userEmail) return;
+
+    let isMounted = true;
+    let pusherClient: Pusher | null = null;
+    let channel: PresenceChannel | null = null;
+    const channelName = `presence-retro-board-${boardId}`;
+
+    const syncMembers = () => {
+      if (!channel) return;
+      const entries: ActivePresenceParticipant[] = [];
+      const members = channel.members as unknown as {
+        each: (callback: (member: { id: string; info?: { name?: string | null; email?: string } }) => void) => void;
+      };
+      members.each((member) => {
+        const email = member.info?.email;
+        if (!email) return;
+        entries.push({
+          id: member.id,
+          user: {
+            id: member.id,
+            name: member.info?.name ?? null,
+            email,
+          },
+        });
+      });
+      entries.sort((a, b) => a.user.email.localeCompare(b.user.email));
+      setActiveParticipants(entries);
+    };
+
+    void import("pusher-js").then(({ default: PusherClient }) => {
+      if (!isMounted) return;
+      const authParams: Record<string, string> = {
+        user_id: userId,
+        user_email: userEmail,
+      };
+      if (userName && userName.trim()) {
+        authParams.user_name = userName.trim();
+      }
+      pusherClient = new PusherClient(key, {
+        cluster,
+        authEndpoint: "/api/pusher/auth",
+        auth: {
+          headers: { "Content-Type": "application/json" },
+          params: authParams,
+        },
+      });
+
+      channel = pusherClient.subscribe(channelName) as PresenceChannel;
+      channel.bind("pusher:subscription_succeeded", syncMembers);
+      channel.bind("pusher:member_added", syncMembers);
+      channel.bind("pusher:member_removed", syncMembers);
+    });
+
+    return () => {
+      isMounted = false;
+      if (channel) {
+        channel.unbind("pusher:subscription_succeeded", syncMembers);
+        channel.unbind("pusher:member_added", syncMembers);
+        channel.unbind("pusher:member_removed", syncMembers);
+        const nameToUnsubscribe = channel.name;
+        pusherClient?.unsubscribe(nameToUnsubscribe);
+      }
+      pusherClient?.disconnect();
+      setActiveParticipants([]);
+    };
+  }, [boardId, user?.id, user?.email, user?.name]);
 
   useEffect(() => {
     if (!loading) return;
