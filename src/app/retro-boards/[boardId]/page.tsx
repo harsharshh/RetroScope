@@ -36,6 +36,13 @@ interface RetroCardPayload {
 
 const UPVOTE_TYPE = "UPVOTE";
 
+function getUpvoteCount(card: RetroCardPayload): number {
+  return (card.reactions ?? []).reduce(
+    (sum, reaction) => (reaction.type === UPVOTE_TYPE ? sum + 1 : sum),
+    0
+  );
+}
+
 interface DraftCardState {
   id: string;
   content: string;
@@ -463,13 +470,10 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
       return acc;
     }, {});
 
-    const countUpvotes = (c: RetroCardPayload) =>
-      (c.reactions ?? []).reduce((sum, r) => (r.type === UPVOTE_TYPE ? sum + 1 : sum), 0);
-
     for (const stageId in grouped) {
       grouped[stageId].sort((a, b) => {
-        const votesB = countUpvotes(b);
-        const votesA = countUpvotes(a);
+        const votesB = getUpvoteCount(b);
+        const votesA = getUpvoteCount(a);
         if (votesB !== votesA) return votesB - votesA; // more votes first
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -487,30 +491,6 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
   }
 
-  function wrapText(text: string, max = 90) {
-    const lines: string[] = [];
-    const paragraphs = text.split(/\r?\n/);
-    paragraphs.forEach((paragraph) => {
-      if (!paragraph.trim()) {
-        lines.push("");
-        return;
-      }
-      const words = paragraph.split(/\s+/);
-      let current = "";
-      words.forEach((word) => {
-        const candidate = current ? `${current} ${word}` : word;
-        if (candidate.length <= max) {
-          current = candidate;
-        } else {
-          if (current) lines.push(current);
-          current = word;
-        }
-      });
-      if (current) lines.push(current);
-    });
-    return lines;
-  }
-
   function buildPdfBlob() {
     if (!board) return null;
     const lines: string[] = [];
@@ -519,26 +499,126 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     lines.push(`Generated: ${timestamp}`);
     lines.push("");
 
+    const stageColumnWidth = 18;
+    const cardColumnWidth = 50;
+    const votesColumnWidth = 12;
+
+    const separator = `+${"-".repeat(stageColumnWidth + 2)}+${"-".repeat(cardColumnWidth + 2)}+${"-".repeat(
+      votesColumnWidth + 2
+    )}+`;
+
+    function padCell(value: string, width: number, alignRight = false) {
+      if (value.length > width) {
+        if (width <= 3) {
+          value = value.slice(0, width);
+        } else {
+          value = `${value.slice(0, width - 3)}...`;
+        }
+      }
+      return alignRight ? value.padStart(width, " ") : value.padEnd(width, " ");
+    }
+
+    function formatRow(stageCell: string, cardCell: string, votesCell: string) {
+      return `| ${padCell(stageCell, stageColumnWidth)} | ${padCell(cardCell, cardColumnWidth)} | ${padCell(
+        votesCell,
+        votesColumnWidth
+      )} |`;
+    }
+
+    function wrapCell(value: string, width: number) {
+      const output: string[] = [];
+      const paragraphs = value.split(/\r?\n/);
+
+      const flushCurrent = (current: string) => {
+        if (current) {
+          output.push(current);
+        }
+      };
+
+      paragraphs.forEach((paragraph, paragraphIndex) => {
+        const trimmed = paragraph.trim();
+        if (!trimmed) {
+          if (paragraphIndex === paragraphs.length - 1) {
+            output.push("");
+          } else if (output.length === 0 || output[output.length - 1] !== "") {
+            output.push("");
+          }
+          return;
+        }
+
+        const words = trimmed.split(/\s+/);
+        let current = "";
+
+        const splitLongWord = (word: string) => {
+          const segments: string[] = [];
+          for (let index = 0; index < word.length; index += width) {
+            segments.push(word.slice(index, index + width));
+          }
+          if (!segments.length) return "";
+          if (segments.length === 1) return segments[0];
+          segments.slice(0, -1).forEach((segment) => output.push(segment));
+          return segments[segments.length - 1];
+        };
+
+        words.forEach((word) => {
+          if (word.length > width) {
+            flushCurrent(current);
+            const tail = splitLongWord(word);
+            if (tail.length === width) {
+              output.push(tail);
+              current = "";
+            } else {
+              current = tail;
+            }
+            return;
+          }
+          const candidate = current ? `${current} ${word}` : word;
+          if (candidate.length > width) {
+            flushCurrent(current);
+            current = word;
+          } else {
+            current = candidate;
+          }
+        });
+
+        flushCurrent(current);
+      });
+
+      return output.length ? output : [""];
+    }
+
+    lines.push(separator);
+    lines.push(formatRow("Stage", "Card", "Votes"));
+    lines.push(separator);
+
     sortedStages.forEach((stage) => {
-      lines.push(`Stage: ${stage.name}`);
       const stageCards = cardsByStage[stage.id] ?? [];
       if (!stageCards.length) {
-        lines.push("  (no cards yet)");
-        lines.push("");
+        const stageLines = wrapCell(stage.name, stageColumnWidth);
+        stageLines.forEach((segment, index) => {
+          const votesLabel = index === 0 ? "0 votes" : "";
+          lines.push(formatRow(segment, index === 0 ? "(no cards yet)" : "", votesLabel));
+        });
+        lines.push(separator);
         return;
       }
-      stageCards.forEach((card) => {
-        const wrapped = wrapText(card.content);
-        if (!wrapped.length) {
-          lines.push("  • ");
-        } else {
-          wrapped.forEach((segment, index) => {
-            lines.push(index === 0 ? `  • ${segment}` : `    ${segment}`);
-          });
+
+      stageCards.forEach((card, cardIndex) => {
+        const cardLines = wrapCell(card.content, cardColumnWidth);
+        const stageLines = cardIndex === 0 ? wrapCell(stage.name, stageColumnWidth) : [""];
+        const voteValue = getUpvoteCount(card);
+        const voteLabel = `${voteValue} vote${voteValue === 1 ? "" : "s"}`;
+        const rowCount = Math.max(cardLines.length, stageLines.length);
+
+        for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+          const stageSegment = rowIndex < stageLines.length ? stageLines[rowIndex] : "";
+          const cardSegment = rowIndex < cardLines.length ? cardLines[rowIndex] : "";
+          const votesSegment = rowIndex === 0 ? voteLabel : "";
+          lines.push(formatRow(stageSegment, cardSegment, votesSegment));
         }
-        lines.push("");
       });
-      lines.push("");
+
+      lines.push(separator);
     });
 
     const startY = 760;
@@ -580,7 +660,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     append(`4 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n${stream}\nendstream\nendobj\n`);
 
     offsets.push(total);
-    append("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+    append("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n");
 
     const xrefOffset = total;
     let xref = `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
@@ -601,14 +681,32 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
       return;
     }
     if (format === "excel") {
-      const stageNameLookup = new Map(sortedStages.map((stage) => [stage.id, stage.name]));
-      const header = "Stage,Card";
-      const rows = cards.map((card) => {
-        const stageName = stageNameLookup.get(card.stageId) ?? "Unassigned";
-        const content = card.content.replace(/"/g, '""');
-        return `"${stageName}","${content}"`;
+      const header = ["Stage", "Card", "Votes"];
+      const rows: string[][] = [header];
+
+      sortedStages.forEach((stage) => {
+        const stageCards = cardsByStage[stage.id] ?? [];
+        if (!stageCards.length) {
+          rows.push([stage.name, "(no cards yet)", "0"]);
+          return;
+        }
+
+        stageCards.forEach((card, index) => {
+          const stageCell = index === 0 ? stage.name : "";
+          const votesCell = getUpvoteCount(card).toString();
+          rows.push([stageCell, card.content, votesCell]);
+        });
       });
-      const csv = [header, ...rows].join("\n");
+
+      const encodeCell = (value: string) => {
+        const normalized = value.replace(/\r?\n/g, "\n");
+        if (/[",\n]/.test(normalized)) {
+          return `"${normalized.replace(/"/g, '""')}"`;
+        }
+        return normalized;
+      };
+
+      const csv = rows.map((line) => line.map(encodeCell).join(",")).join("\r\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
