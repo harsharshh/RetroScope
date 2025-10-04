@@ -24,7 +24,6 @@ export default function CreateBoardPage() {
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdBoard, setCreatedBoard] = useState<CreateBoardResponse | null>(null);
 
   useEffect(() => {
     setStages((prev) => {
@@ -42,7 +41,6 @@ export default function CreateBoardPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setCreatedBoard(null);
 
     if (!title.trim()) {
       setError("Board name is required.");
@@ -72,7 +70,6 @@ export default function CreateBoardPage() {
       }
 
       const board: CreateBoardResponse = await boardResponse.json();
-      setCreatedBoard(board);
       setTitle("");
       setStageCount(stages.length);
       setStages((prev) => prev.map((stage, idx) => ({ name: `Stage ${idx + 1}` })));
@@ -168,13 +165,6 @@ export default function CreateBoardPage() {
           {error ? (
             <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-500">
               {error}
-            </div>
-          ) : null}
-
-          {createdBoard ? (
-            <div className="rounded-xl border border-retroscope-teal/30 bg-retroscope-teal/10 px-4 py-3 text-sm text-retroscope-teal">
-              Board “{createdBoard.title}” created! Note the ID {createdBoard.id}. You can explore it via
-              the REST endpoint at <code className="font-mono">/api/retro-boards/{createdBoard.id}</code>.
             </div>
           ) : null}
 

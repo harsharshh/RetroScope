@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import SiteHeader from "@/components/SiteHeader";
 import { useRouter } from "next/navigation";
@@ -17,46 +17,46 @@ export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState<LocalUser | null>(null);
   const [joinedBoards, setJoinedBoards] = useState<Array<{ id: string; title: string }>>([]);
+  const [animReady, setAnimReady] = useState(false);
+
+  useLayoutEffect(() => {
+    let ctx: gsap.Context | undefined;
+    try {
+      if (!heroRef.current) {
+        // Ensure elements are visible even if ref not ready
+        gsap.set([".hero-badge", ".hero-title", ".hero-subtitle", ".hero-cta"], { autoAlpha: 1, clearProps: "all" });
+        if (cardRef.current) gsap.set(cardRef.current, { autoAlpha: 1, clearProps: "all" });
+        return;
+      }
+
+      ctx = gsap.context(() => {
+        const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+        // safety: set initial state (avoids flash if CSS classes change)
+        tl.set([".hero-badge", ".hero-title", ".hero-subtitle", ".hero-cta"], { autoAlpha: 0 });
+        if (cardRef.current) tl.set(cardRef.current, { autoAlpha: 0 });
+
+        tl.from(".hero-badge", { y: -20, autoAlpha: 0, duration: 0.6, ease: "power2.out" })
+          .from(".hero-title", { y: 40, autoAlpha: 0, duration: 0.8 }, "-=0.25")
+          .from(".hero-subtitle", { y: 20, autoAlpha: 0, duration: 0.7 }, "-=0.35")
+          .from(".hero-cta", { y: 10, autoAlpha: 0, duration: 0.6, stagger: 0.15 }, "-=0.30");
+
+        if (cardRef.current) {
+          tl.from(cardRef.current, { x: 40, autoAlpha: 0, duration: 0.8, delay: 0.2 });
+        }
+      }, heroRef);
+    } catch (e) {
+      // Hard fallback: clear styles so page stays visible
+      gsap.set([".hero-badge", ".hero-title", ".hero-subtitle", ".hero-cta"], { autoAlpha: 1, clearProps: "all" });
+      if (cardRef.current) gsap.set(cardRef.current, { autoAlpha: 1, clearProps: "all" });
+      console.warn("GSAP animation failed, showing content immediately.", e);
+    }
+    return () => ctx?.revert();
+  }, []);
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.from(".hero-badge", {
-        y: -20,
-        opacity: 0,
-        duration: 0.6,
-        ease: "power2.out",
-      });
-      gsap.from(".hero-title", {
-        y: 40,
-        opacity: 0,
-        duration: 0.8,
-        ease: "power3.out",
-        delay: 0.2,
-      });
-      gsap.from(".hero-subtitle", {
-        y: 20,
-        opacity: 0,
-        duration: 0.7,
-        ease: "power2.out",
-        delay: 0.4,
-      });
-      gsap.from(".hero-cta", {
-        opacity: 0,
-        y: 10,
-        duration: 0.6,
-        stagger: 0.15,
-        ease: "power2.out",
-        delay: 0.6,
-      });
-      gsap.from(cardRef.current, {
-        opacity: 0,
-        x: 40,
-        duration: 0.8,
-        ease: "power3.out",
-        delay: 1.0,
-      });
-    }, heroRef);
-    return () => ctx.revert();
+    // Ensure content becomes visible even if GSAP fails or is blocked
+    setAnimReady(true);
   }, []);
 
   useEffect(() => {
@@ -118,17 +118,17 @@ export default function Home() {
       />
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 items-center px-6 pb-16 pt-6 sm:px-10">
-        <div ref={heroRef} className="grid w-full items-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-8">
-            <span className="hero-badge inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground shadow-sm backdrop-blur">
+        <div ref={heroRef} className="grid w-full items-center content-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px] min-h-[70vh]">
+          <div className="space-y-8 self-center">
+            <span className={`hero-badge ${animReady ? "" : "opacity-0"} inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground shadow-sm backdrop-blur`}>
               Sprint retros made simple
             </span>
-            <h1 className="hero-title text-balance text-4xl font-semibold leading-[1.05] text-foreground sm:text-5xl lg:text-6xl">
+            <h1 className={`hero-title ${animReady ? "" : "opacity-0"} text-balance text-4xl font-semibold leading-[1.05] text-foreground sm:text-5xl lg:text-6xl`}>
               Illuminate your {" "}
               <span className="bg-retroscope-gradient bg-clip-text text-transparent">retro meetings</span>{" "}
               and celebrate the wins that fuel your next sprint.
             </h1>
-            <p className="hero-subtitle max-w-xl text-lg text-muted-foreground sm:text-xl">
+            <p className={`hero-subtitle ${animReady ? "" : "opacity-0"} max-w-xl text-lg text-muted-foreground sm:text-xl`}>
               RetroScope helps agile teams transform raw feedback into insight-rich actions.
               Capture the highs, surface the blockers, and align on what comes next—with a
               workflow your whole squad will love.
@@ -136,7 +136,7 @@ export default function Home() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <a
                 href="/create-board"
-                className="hero-cta inline-flex items-center justify-center rounded-full bg-retroscope-gradient px-6 py-3 text-base font-semibold text-white shadow-glow transition-transform hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-retroscope-orange"
+                className={`hero-cta ${animReady ? "" : "opacity-0"} inline-flex w-fit max-w-full items-center justify-center rounded-full bg-retroscope-gradient px-6 py-3 text-base font-semibold text-white shadow-glow transition-transform hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-retroscope-orange whitespace-nowrap`}
               >
                 Get started for free
               </a>
@@ -163,7 +163,7 @@ export default function Home() {
             </dl> */}
           </div>
 
-          <section ref={cardRef} className="relative">
+          <section ref={cardRef} className={`relative ${animReady ? "" : "opacity-0"}`}>
             <div className="absolute -left-6 top-8 h-16 w-16 rounded-full border border-retroscope-teal/30 bg-retroscope-teal/15 blur-2xl dark:border-retroscope-teal/20" />
             <div className="absolute -right-8 bottom-4 h-20 w-20 rounded-full border border-retroscope-purple/30 bg-retroscope-purple/15 blur-3xl dark:border-retroscope-purple/20" />
             <div className="relative overflow-hidden rounded-3xl border border-surface-border bg-surface p-8 shadow-glow backdrop-blur">

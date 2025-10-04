@@ -1,7 +1,7 @@
 import { CardType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getPusherServer } from "@/lib/pusher-server";
+import { triggerBoardEvent } from "@/lib/pusher-server";
 
 export async function PATCH(
   request: Request,
@@ -13,6 +13,7 @@ export async function PATCH(
     type: string;
     stageId: string;
     votes: number;
+    actorId: string;
   }>;
 
   try {
@@ -46,9 +47,8 @@ export async function PATCH(
       },
     });
 
-    const pusher = getPusherServer();
-    if (pusher) {
-      const eventCard = {
+    await triggerBoardEvent(boardId, "card:updated", {
+      card: {
         id: card.id,
         content: card.content,
         stageId: card.stageId,
@@ -67,9 +67,9 @@ export async function PATCH(
           userId: reaction.userId,
           type: reaction.type,
         })),
-      };
-      void pusher.trigger(`presence-retro-board-${boardId}`, "card:updated", { card: eventCard });
-    }
+      },
+      initiatorId: body.actorId ?? null,
+    });
 
     return NextResponse.json(card);
   } catch (error) {
@@ -83,13 +83,17 @@ export async function DELETE(
   { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
   const { boardId, cardId } = await params;
+  let body: { actorId?: string } = {};
+
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
 
   try {
     await prisma.retroCard.delete({ where: { id: cardId } });
-    const pusher = getPusherServer();
-    if (pusher) {
-      void pusher.trigger(`presence-retro-board-${boardId}`, "card:deleted", { cardId });
-    }
+    await triggerBoardEvent(boardId, "card:deleted", { cardId, initiatorId: body.actorId ?? null });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(`DELETE /api/retro-boards/${boardId}/cards/${cardId} failed`, error);

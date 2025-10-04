@@ -416,7 +416,7 @@ export default function SiteHeader({
                       <span className="text-sm font-medium text-foreground">{displayName}</span>
                       {user.email ? (
                         <span className="text-xs text-muted-foreground">{user.email}</span>
-                      ) : null}
+                      ) : null}                     
                     </div>
                     <div className="mt-3 flex flex-col gap-2">
                       <button
@@ -490,23 +490,26 @@ function BoardsDialog({
             boards.map((board) => (
               <div
                 key={board.id}
-                className="rounded-2xl border border-surface-border/70 bg-surface/90 p-4"
+                className="group relative grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-surface-border/70 bg-surface/90 p-4 shadow-sm transition hover:shadow-lg"
               >
-                <h3 className="text-sm font-semibold text-foreground">{board.title}</h3>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    className="flex-1 rounded-full border border-surface-border px-3 py-2 text-xs font-semibold text-foreground transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
-                    onClick={() => {
-                      onSelectBoard?.(board.id);
-                      onClose();
-                    }}
+                <div className="pointer-events-none absolute inset-0 z-0 opacity-[.06] transition group-hover:opacity-10" style={{background:"radial-gradient(120px 80px at 20% 0%, var(--retroscope-orange)/.8, transparent 60%), radial-gradient(120px 80px at 80% 120%, var(--retroscope-purple)/.8, transparent 60%)"}} />
+                <h3 className="relative z-10 flex items-center gap-2 text-sm font-semibold text-foreground no-underline">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-retroscope-gradient text-[11px] font-bold text-white shadow">R</span>
+                  <span className="truncate">{board.title}</span>
+                </h3>
+                <div className="relative z-10 flex items-center gap-2">
+                  <Link
+                    href={`/retro-boards/${board.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => onSelectBoard?.(board.id)}
+                    className="rounded-full bg-retroscope-gradient px-3 py-2 text-center text-xs font-semibold text-white shadow-glow transition hover:brightness-110 whitespace-nowrap"
                   >
-                    Open board
-                  </button>
+                    Open in new tab
+                  </Link>
                   <button
                     type="button"
-                    className="flex-1 rounded-full border border-surface-border px-3 py-2 text-xs font-semibold text-foreground transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
+                    className="rounded-full border border-surface-border bg-background/60 px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition hover:border-retroscope-orange/60 hover:text-retroscope-orange whitespace-nowrap"
                     onClick={() => onCopy(board.id)}
                   >
                     {copiedBoardId === board.id ? "Copied" : "Copy link"}

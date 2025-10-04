@@ -50,18 +50,21 @@ type ActivePresenceParticipant = {
 
 type CardEventPayload = {
   card: RetroCardPayload & { updatedAt?: string | null };
+  initiatorId?: string | null;
 };
 
-type CardDeletedPayload = { cardId: string };
+type CardDeletedPayload = { cardId: string; initiatorId?: string | null };
 
 type CardReactionAddedPayload = {
   cardId: string;
   reaction: { id: string; userId: string; type: string };
+  initiatorId?: string | null;
 };
 
 type CardReactionRemovedPayload = {
   cardId: string;
   reaction: { userId: string; type: string };
+  initiatorId?: string | null;
 };
 
 function getUpvoteCount(card: RetroCardPayload): number {
@@ -436,6 +439,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
 
     const handleCardCreated = (payload: CardEventPayload) => {
       if (!payload?.card) return;
+      if (payload.initiatorId && userId && payload.initiatorId === userId) return;
       setCards((previous) => {
         if (previous.some((card) => card.id === payload.card.id)) {
           return previous;
@@ -446,6 +450,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
 
     const handleCardUpdated = (payload: CardEventPayload) => {
       if (!payload?.card) return;
+      if (payload.initiatorId && userId && payload.initiatorId === userId) return;
       setCards((previous) =>
         previous.map((card) => (card.id === payload.card.id ? { ...card, ...payload.card } : card))
       );
@@ -453,11 +458,13 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
 
     const handleCardDeleted = (payload: CardDeletedPayload) => {
       if (!payload?.cardId) return;
+      if (payload.initiatorId && userId && payload.initiatorId === userId) return;
       setCards((previous) => previous.filter((card) => card.id !== payload.cardId));
     };
 
     const handleReactionAdded = (payload: CardReactionAddedPayload) => {
       if (!payload?.cardId || !payload.reaction) return;
+      if (payload.initiatorId && userId && payload.initiatorId === userId) return;
       setCards((previous) =>
         previous.map((card) => {
           if (card.id !== payload.cardId) return card;
@@ -475,6 +482,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
 
     const handleReactionRemoved = (payload: CardReactionRemovedPayload) => {
       if (!payload?.cardId || !payload.reaction) return;
+      if (payload.initiatorId && userId && payload.initiatorId === userId) return;
       setCards((previous) =>
         previous.map((card) => {
           if (card.id !== payload.cardId) return card;
@@ -1109,7 +1117,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
       const response = await fetch(`/api/retro-boards/${boardId}/cards/${card.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, actorId: user.id }),
       });
 
       if (!response.ok) {
@@ -1137,6 +1145,8 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     try {
       const response = await fetch(`/api/retro-boards/${boardId}/cards/${card.id}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actorId: user?.id ?? null }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
