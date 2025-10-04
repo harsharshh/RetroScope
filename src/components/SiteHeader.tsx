@@ -13,6 +13,10 @@ interface SiteHeaderProps {
   activeStageFilter?: string | "ALL";
   onStageFilterChange?: (value: string | "ALL") => void;
   onExport?: (format: "pdf" | "excel") => void;
+  activeParticipants?: Array<{
+    id: string;
+    user: { id: string; name?: string | null; email: string };
+  }>;
 }
 
 export default function SiteHeader({
@@ -24,6 +28,7 @@ export default function SiteHeader({
   activeStageFilter = "ALL",
   onStageFilterChange,
   onExport,
+  activeParticipants = [],
 }: SiteHeaderProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [showBoards, setShowBoards] = useState(false);
@@ -36,9 +41,12 @@ export default function SiteHeader({
   const [isExportOpen, setIsExportOpen] = useState(false);
   const exportTriggerRef = useRef<HTMLButtonElement>(null);
   const exportPopoverRef = useRef<HTMLDivElement>(null);
+  const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
+  const participantsTriggerRef = useRef<HTMLButtonElement>(null);
+  const participantsPopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isPopoverOpen && !isFilterOpen && !isExportOpen) return;
+    if (!isPopoverOpen && !isFilterOpen && !isExportOpen && !isParticipantsOpen) return;
 
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
@@ -63,13 +71,20 @@ export default function SiteHeader({
       ) {
         setIsExportOpen(false);
       }
+      if (
+        isParticipantsOpen &&
+        !participantsTriggerRef.current?.contains(target) &&
+        !participantsPopoverRef.current?.contains(target)
+      ) {
+        setIsParticipantsOpen(false);
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isPopoverOpen, isFilterOpen, isExportOpen]);
+  }, [isPopoverOpen, isFilterOpen, isExportOpen, isParticipantsOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -99,11 +114,33 @@ export default function SiteHeader({
 
   const avatarInitial = user ? (user.name?.trim()?.[0] ?? user.email?.[0] ?? "?") : "";
   const displayName = user?.name?.trim() || user?.email || "";
+  const activeCount = activeParticipants.length;
 
   const activeStageLabel = useMemo(() => {
     if (activeStageFilter === "ALL") return "All stages";
     return stageFilters.find((stage) => stage.id === activeStageFilter)?.name ?? "All stages";
   }, [activeStageFilter, stageFilters]);
+
+  const participantPalette = useMemo(() => {
+    const colors = [
+      "#FF8A65",
+      "#4DB6AC",
+      "#9575CD",
+      "#F06292",
+      "#4FC3F7",
+      "#81C784",
+      "#FFD54F",
+      "#BA68C8",
+      "#90A4AE",
+      "#A1887F",
+    ];
+    return (seed: string) => {
+      const index = Math.abs(
+        seed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+      ) % colors.length;
+      return colors[index];
+    };
+  }, []);
 
   async function handleCopy(boardId: string) {
     try {
@@ -121,7 +158,7 @@ export default function SiteHeader({
   return (
     <>
       <header className="sticky top-0 z-50  bg-background/90 backdrop-blur">
-        <div className="mx-auto flex w-full  items-center justify-between px-6 pb-4 pt-8 sm:px-10">
+        <div className="mx-auto grid w-full grid-cols-[auto,1fr,auto] items-center px-6 pb-4 pt-8 sm:px-10">
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -142,7 +179,85 @@ export default function SiteHeader({
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center">
+            {boardContext && activeCount ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  ref={participantsTriggerRef}
+                  onClick={() => setIsParticipantsOpen((previous) => !previous)}
+                  className="flex items-center gap-2 rounded-full bg-surface/90 px-4 py-2 text-sm font-semibold text-foreground shadow-sm backdrop-blur transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
+                  aria-haspopup="listbox"
+                  aria-expanded={isParticipantsOpen}
+                >
+                             {/* Active participants badge */}
+                             <div className="flex items-center justify-between">
+                    <div
+                      aria-live="polite"
+                      className="relative inline-flex items-center gap-2 rounded-full border border-emerald-300/50 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-400/10 dark:text-emerald-300"
+                    >
+                      <span className="relative inline-flex h-3 w-3">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
+                      </span>
+                      <span>
+                        {activeParticipants.length} active
+                      </span>
+                      <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`h-4 w-4 transition ${isParticipantsOpen ? "rotate-180" : ""}`}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                    </div>
+                  </div>
+                </button>
+                {isParticipantsOpen ? (
+                  <div
+                    ref={participantsPopoverRef}
+                    className="absolute left-1/2 z-40 mt-3 w-72 -translate-x-1/2 rounded-2xl border border-surface-border bg-background p-3 shadow-xl"
+                  >
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <span className="text-sm font-semibold text-foreground">Active participants</span>
+                      <span className="text-xs font-medium text-muted-foreground">{activeCount}</span>
+                    </div>
+                    <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
+                      {activeParticipants.map((participant) => {
+                        const participantName = participant.user.name?.trim() || participant.user.email;
+                        const avatarLetter = participantName[0]?.toUpperCase() ?? "?";
+                        const background = participantPalette(participant.user.id);
+                        return (
+                          <li
+                            key={participant.id}
+                            className="flex items-center gap-3 rounded-xl border border-surface-border/60 bg-surface/90 px-3 py-2"
+                          >
+                            <span
+                              className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold text-white"
+                              style={{ backgroundColor: background }}
+                              aria-hidden
+                            >
+                              {avatarLetter}
+                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-foreground">{participantName}</span>
+                              <span className="text-xs text-muted-foreground">{participant.user.email}</span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-end gap-3">
             {onExport && boardContext ? (
               <div className="relative">
                 <button

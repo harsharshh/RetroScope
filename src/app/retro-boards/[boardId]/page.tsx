@@ -173,6 +173,8 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
     { content: string; saving: boolean; error: string | null }
   >>({});
   const [activeStageFilter, setActiveStageFilter] = useState<string | "ALL">("ALL");
+  const [confirmingDeleteCardId, setConfirmingDeleteCardId] = useState<string | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -359,6 +361,10 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
   const stageFilterOptions = useMemo(() => {
     return sortedStages.map((stage) => ({ id: stage.id, name: stage.name }));
   }, [sortedStages]);
+
+  const activeParticipants = useMemo(() => {
+    return (board?.participants ?? []).filter((participant) => Boolean(participant.user));
+  }, [board?.participants]);
 
   useEffect(() => {
     if (!loading) return;
@@ -954,9 +960,6 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
 
   async function handleDeleteCard(card: RetroCardPayload) {
     if (!boardId) return;
-    const confirmed = window.confirm("Delete this card?");
-    if (!confirmed) return;
-
     try {
       const response = await fetch(`/api/retro-boards/${boardId}/cards/${card.id}`, {
         method: "DELETE",
@@ -1167,6 +1170,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
         activeStageFilter={activeStageFilter}
         onStageFilterChange={handleStageFilterChange}
         onExport={handleExport}
+        activeParticipants={activeParticipants}
       />
 
       <main className="mx-auto flex w-full  flex-1 flex-col gap-6 px-6 pb-16 pt-6 sm:px-10">
@@ -1355,7 +1359,7 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteCard(card)}
+                                  onClick={() => setConfirmingDeleteCardId(card.id)}
                                   className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-black/30 text-white shadow-sm backdrop-blur transition hover:scale-105"
                                   aria-label="Delete card"
                                 >
@@ -1553,6 +1557,48 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
           Preparing your board…
         </div>
       )}
+    {/* Confirm Delete Modal */}
+    {confirmingDeleteCardId && (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+        onClick={() => setConfirmingDeleteCardId(null)}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl border border-surface-border bg-background p-6 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-lg font-semibold text-foreground">Delete this card?</h3>
+          <p className="mt-1 text-sm text-muted-foreground">This action cannot be undone.</p>
+          <div className="mt-6 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmingDeleteCardId(null)}
+              className="rounded-full border border-surface-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:border-retroscope-orange/60 hover:text-retroscope-orange"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (confirmingDeleteCardId) {
+                  setDeletingCardId(confirmingDeleteCardId);
+                  const card = cards.find((c) => c.id === confirmingDeleteCardId);
+                  if (card) {
+                    await handleDeleteCard(card);
+                  }
+                  setDeletingCardId(null);
+                  setConfirmingDeleteCardId(null);
+                }
+              }}
+              className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={deletingCardId === confirmingDeleteCardId}
+            >
+              {deletingCardId === confirmingDeleteCardId ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
