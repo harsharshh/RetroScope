@@ -1,6 +1,7 @@
 import { CardType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getPusherServer } from "@/lib/pusher-server";
 
 type CreateCardBody = {
   content?: string;
@@ -78,6 +79,26 @@ export async function POST(
         stage: true,
       },
     });
+
+    const pusher = getPusherServer();
+    if (pusher) {
+      const eventCard = {
+        id: card.id,
+        content: card.content,
+        stageId: card.stageId,
+        authorId: card.authorId,
+        author: card.author
+          ? {
+              id: card.author.id,
+              name: card.author.name,
+              email: card.author.email,
+            }
+          : null,
+        createdAt: card.createdAt?.toISOString() ?? null,
+        reactions: [] as Array<{ id: string; userId: string; type: string }>,
+      };
+      void pusher.trigger(`presence-retro-board-${boardId}`, "card:created", { card: eventCard });
+    }
 
     return NextResponse.json(card, { status: 201 });
   } catch (error) {

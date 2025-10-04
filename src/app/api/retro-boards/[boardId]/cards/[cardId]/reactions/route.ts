@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getPusherServer } from "@/lib/pusher-server";
 
 type ReactionBody = {
   type?: string;
@@ -10,7 +11,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = await params;
+  const { boardId, cardId } = await params;
   let body: ReactionBody;
 
   try {
@@ -40,6 +41,18 @@ export async function POST(
       },
     });
 
+    const pusher = getPusherServer();
+    if (pusher) {
+      void pusher.trigger(`presence-retro-board-${boardId}`, "card:reaction-added", {
+        cardId,
+        reaction: {
+          id: reaction.id,
+          userId: reaction.userId,
+          type: reaction.type,
+        },
+      });
+    }
+
     return NextResponse.json(reaction, { status: 201 });
   } catch (error) {
     console.error(`POST reaction for card ${cardId} failed`, error);
@@ -51,7 +64,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ boardId: string; cardId: string }> }
 ) {
-  const { cardId } = await params;
+  const { boardId, cardId } = await params;
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const userId = searchParams.get("userId");
@@ -70,6 +83,14 @@ export async function DELETE(
         },
       },
     });
+
+    const pusher = getPusherServer();
+    if (pusher) {
+      void pusher.trigger(`presence-retro-board-${boardId}`, "card:reaction-removed", {
+        cardId,
+        reaction: { userId, type },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

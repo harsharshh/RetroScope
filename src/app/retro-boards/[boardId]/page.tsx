@@ -37,9 +37,31 @@ interface RetroCardPayload {
 
 const UPVOTE_TYPE = "UPVOTE";
 
+const CARD_CREATED_EVENT = "card:created";
+const CARD_UPDATED_EVENT = "card:updated";
+const CARD_DELETED_EVENT = "card:deleted";
+const CARD_REACTION_ADDED_EVENT = "card:reaction-added";
+const CARD_REACTION_REMOVED_EVENT = "card:reaction-removed";
+
 type ActivePresenceParticipant = {
   id: string;
   user: { id: string; name?: string | null; email: string };
+};
+
+type CardEventPayload = {
+  card: RetroCardPayload & { updatedAt?: string | null };
+};
+
+type CardDeletedPayload = { cardId: string };
+
+type CardReactionAddedPayload = {
+  cardId: string;
+  reaction: { id: string; userId: string; type: string };
+};
+
+type CardReactionRemovedPayload = {
+  cardId: string;
+  reaction: { userId: string; type: string };
 };
 
 function getUpvoteCount(card: RetroCardPayload): number {
@@ -412,6 +434,64 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
       setActiveParticipants(entries);
     };
 
+    const handleCardCreated = (payload: CardEventPayload) => {
+      if (!payload?.card) return;
+      setCards((previous) => {
+        if (previous.some((card) => card.id === payload.card.id)) {
+          return previous;
+        }
+        return [payload.card, ...previous];
+      });
+    };
+
+    const handleCardUpdated = (payload: CardEventPayload) => {
+      if (!payload?.card) return;
+      setCards((previous) =>
+        previous.map((card) => (card.id === payload.card.id ? { ...card, ...payload.card } : card))
+      );
+    };
+
+    const handleCardDeleted = (payload: CardDeletedPayload) => {
+      if (!payload?.cardId) return;
+      setCards((previous) => previous.filter((card) => card.id !== payload.cardId));
+    };
+
+    const handleReactionAdded = (payload: CardReactionAddedPayload) => {
+      if (!payload?.cardId || !payload.reaction) return;
+      setCards((previous) =>
+        previous.map((card) => {
+          if (card.id !== payload.cardId) return card;
+          const reactions = card.reactions ?? [];
+          const existingIndex = reactions.findIndex((reaction) => reaction.id === payload.reaction.id);
+          if (existingIndex >= 0) {
+            const nextReactions = reactions.slice();
+            nextReactions[existingIndex] = payload.reaction;
+            return { ...card, reactions: nextReactions };
+          }
+          return { ...card, reactions: [...reactions, payload.reaction] };
+        })
+      );
+    };
+
+    const handleReactionRemoved = (payload: CardReactionRemovedPayload) => {
+      if (!payload?.cardId || !payload.reaction) return;
+      setCards((previous) =>
+        previous.map((card) => {
+          if (card.id !== payload.cardId) return card;
+          const reactions = card.reactions ?? [];
+          return {
+            ...card,
+            reactions: reactions.filter(
+              (reaction) =>
+                !(
+                  reaction.userId === payload.reaction.userId && reaction.type === payload.reaction.type
+                )
+            ),
+          };
+        })
+      );
+    };
+
     void import("pusher-js").then(({ default: PusherClient }) => {
       if (!isMounted) return;
       const authParams: Record<string, string> = {
@@ -434,6 +514,11 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
       channel.bind("pusher:subscription_succeeded", syncMembers);
       channel.bind("pusher:member_added", syncMembers);
       channel.bind("pusher:member_removed", syncMembers);
+      channel.bind(CARD_CREATED_EVENT, handleCardCreated);
+      channel.bind(CARD_UPDATED_EVENT, handleCardUpdated);
+      channel.bind(CARD_DELETED_EVENT, handleCardDeleted);
+      channel.bind(CARD_REACTION_ADDED_EVENT, handleReactionAdded);
+      channel.bind(CARD_REACTION_REMOVED_EVENT, handleReactionRemoved);
     });
 
     return () => {
@@ -442,6 +527,11 @@ export default function BoardPage({ params }: { params: Promise<{ boardId: strin
         channel.unbind("pusher:subscription_succeeded", syncMembers);
         channel.unbind("pusher:member_added", syncMembers);
         channel.unbind("pusher:member_removed", syncMembers);
+        channel.unbind(CARD_CREATED_EVENT, handleCardCreated);
+        channel.unbind(CARD_UPDATED_EVENT, handleCardUpdated);
+        channel.unbind(CARD_DELETED_EVENT, handleCardDeleted);
+        channel.unbind(CARD_REACTION_ADDED_EVENT, handleReactionAdded);
+        channel.unbind(CARD_REACTION_REMOVED_EVENT, handleReactionRemoved);
         const nameToUnsubscribe = channel.name;
         pusherClient?.unsubscribe(nameToUnsubscribe);
       }
