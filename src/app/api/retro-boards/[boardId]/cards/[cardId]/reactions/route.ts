@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getPusherServer } from "@/lib/pusher-server";
+import { triggerBoardEvent } from "@/lib/pusher-server";
 
 type ReactionBody = {
   type?: string;
@@ -41,17 +41,15 @@ export async function POST(
       },
     });
 
-    const pusher = getPusherServer();
-    if (pusher) {
-      void pusher.trigger(`presence-retro-board-${boardId}`, "card:reaction-added", {
-        cardId,
-        reaction: {
-          id: reaction.id,
-          userId: reaction.userId,
-          type: reaction.type,
-        },
-      });
-    }
+    await triggerBoardEvent(boardId, "card:reaction-added", {
+      cardId,
+      reaction: {
+        id: reaction.id,
+        userId: reaction.userId,
+        type: reaction.type,
+      },
+      initiatorId: body.userId ?? null,
+    });
 
     return NextResponse.json(reaction, { status: 201 });
   } catch (error) {
@@ -84,13 +82,11 @@ export async function DELETE(
       },
     });
 
-    const pusher = getPusherServer();
-    if (pusher) {
-      void pusher.trigger(`presence-retro-board-${boardId}`, "card:reaction-removed", {
-        cardId,
-        reaction: { userId, type },
-      });
-    }
+    await triggerBoardEvent(boardId, "card:reaction-removed", {
+      cardId,
+      reaction: { userId, type },
+      initiatorId: userId,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

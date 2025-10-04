@@ -27,3 +27,20 @@ export function getPusherServer(): Pusher | null {
 
   return cachedPusher;
 }
+
+export async function triggerBoardEvent(
+  boardId: string,
+  eventName: string,
+  payload: unknown
+): Promise<boolean> {
+  const pusher = getPusherServer();
+  if (!pusher) return false;
+
+  try {
+    await pusher.trigger(`presence-retro-board-${boardId}`, eventName, payload);
+    return true;
+  } catch (error) {
+    console.warn("Unable to trigger Pusher event", { boardId, eventName, error });
+    return false;
+  }
+}
