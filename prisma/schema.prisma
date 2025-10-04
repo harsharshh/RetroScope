@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PRISMA_DATABASE_URL")
+}
+
+enum BoardStatus {
+  DRAFT
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum CardType {
+  START
+  STOP
+  CONTINUE
+  KUDOS
+  BLOCKER
+  IDEA
+}
+
+model User {
+  id             String                   @id @default(cuid())
+  email          String                   @unique
+  name           String?
+  avatarUrl      String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  ownedBoards    RetroBoard[]             @relation("BoardOwner")
+  facilitatedRetros RetroBoard[]          @relation("BoardFacilitator")
+  participations RetroBoardParticipant[]
+  cards          RetroCard[]              @relation("CardAuthor")
+  comments       RetroComment[]
+  reactions      RetroCardReaction[]
+}
+
+model RetroBoard {
+  id             String                    @id @default(cuid())
+  title          String
+  summary        String?
+  status         BoardStatus               @default(DRAFT)
+  scheduledFor   DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  owner          User?                     @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId        String?
+
+  facilitator    User?                     @relation("BoardFacilitator", fields: [facilitatorId], references: [id], onDelete: SetNull)
+  facilitatorId  String?
+
+  stages         RetroStage[]
+  cards          RetroCard[]
+  participants   RetroBoardParticipant[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([scheduledFor])
+}
+
+model RetroBoardParticipant {
+  id         String      @id @default(cuid())
+  role       String?     @db.VarChar(64)
+  joinedAt   DateTime    @default(now())
+
+  board      RetroBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId    String
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+
+  @@unique([boardId, userId])
+  @@index([userId])
+}
+
+model RetroStage {
+  id         String      @id @default(cuid())
+  name       String
+  order      Int
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  board      RetroBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId    String
+
+  cards      RetroCard[]
+
+  @@unique([boardId, order])
+  @@index([boardId])
+}
+
+model RetroCard {
+  id         String       @id @default(cuid())
+  content    String       @db.Text
+  type       CardType     @default(CONTINUE)
+  votes      Int          @default(0)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  board      RetroBoard   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId    String
+
+  stage      RetroStage   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stageId    String
+
+  author     User?        @relation("CardAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  authorId   String?
+
+  comments   RetroComment[]
+  reactions  RetroCardReaction[]
+
+  @@index([boardId])
+  @@index([stageId])
+  @@index([authorId])
+}
+
+model RetroComment {
+  id         String     @id @default(cuid())
+  body       String     @db.Text
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  card       RetroCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId     String
+
+  author     User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId   String
+
+  @@index([cardId])
+  @@index([authorId])
+}
+
+model RetroCardReaction {
+  id         String     @id @default(cuid())
+  type       String     @db.VarChar(24)
+  createdAt  DateTime   @default(now())
+
+  card       RetroCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId     String
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+
+  @@unique([cardId, userId, type])
+  @@index([userId])
+}
