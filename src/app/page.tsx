@@ -17,7 +17,9 @@ export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState<LocalUser | null>(null);
   const [joinedBoards, setJoinedBoards] = useState<Array<{ id: string; title: string }>>([]);
-  const [animReady, setAnimReady] = useState(false);
+  // Default to true so the UI doesn't intermittently stay hidden before GSAP runs.
+  // GSAP will still set the initial "autoAlpha" and animate elements when available.
+  const [animReady, setAnimReady] = useState(true);
 
   useLayoutEffect(() => {
     let ctx: gsap.Context | undefined;
@@ -29,6 +31,7 @@ export default function Home() {
         return;
       }
 
+      // Use the actual DOM node as the scope so selectors resolve consistently.
       ctx = gsap.context(() => {
         const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
 
@@ -44,7 +47,7 @@ export default function Home() {
         if (cardRef.current) {
           tl.from(cardRef.current, { x: 40, autoAlpha: 0, duration: 0.8, delay: 0.2 });
         }
-      }, heroRef);
+      }, heroRef.current);
     } catch (e) {
       // Hard fallback: clear styles so page stays visible
       gsap.set([".hero-badge", ".hero-title", ".hero-subtitle", ".hero-cta"], { autoAlpha: 1, clearProps: "all" });
@@ -54,10 +57,7 @@ export default function Home() {
     return () => ctx?.revert();
   }, []);
 
-  useEffect(() => {
-    // Ensure content becomes visible even if GSAP fails or is blocked
-    setAnimReady(true);
-  }, []);
+  
 
   useEffect(() => {
     try {
